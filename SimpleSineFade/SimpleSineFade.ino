@@ -4,7 +4,7 @@
 //Simple code to output a PWM sine wave signal on pin 9
 //////////////////////////////////////////////////////////////////
 
-#define lightPin 11
+#define lightPin 9
 #define potPin A1
 
 #define smoothSteps 50 // Smooth steps (50 index's == 2.5 second smoothing with 50ms sampleWindow)
@@ -59,8 +59,7 @@ void loop(){
   }
   
   if (fading) {
-    int potVal = analogRead(potPin);
-    potVal = map(potVal, 0, 700, 2, 50);
+    int potVal = 25;
     for(int i = 0; i<180; i++){
       //convert 0-360 angle to radian (needed for sin function)
       float rad = DEG_TO_RAD * i;
