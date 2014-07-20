@@ -1,14 +1,19 @@
 //Settings (Disse må justeres!)
 double maxPower = 10.0; //Fade område, afgør hvor lang tid det skal tage at nå max lys intensitet - jo højere destro længere tid - Default 10.0;
-double maxVolts = 0.6; //Sensitivitet - jo lavere detro mere sensitiv (max er 3.0) - Default 0.6
-double decayRate = 25.0; //Bestemmer hvor hurtigt lyset skal fade ud - jo højere destro hurtigere - Default 25.0
-double idleThreshold = 30.0; //Bestemmer hvor høj intensitet idle fadet skal nå - jo højere destro stærkere - Default 30.0
+double maxVolts = 0.5; //Sensitivitet - jo lavere detro mere sensitiv (max er 3.0) - Default 0.5
+double ambientNoise = 0.0; //En fælles variable der styrer hvor meget ambient støj der er i området (vind, biler, etc) - 0.0 på kontoret, burde også være 0.0 i realiteten, men nu kan den styres just in case.
 
+//Idle settings
+double idleThreshold = 30.0; //Bestemmer hvor høj intensitet idle fadet skal nå - jo højere destro stærkere - Default 30.0 : 255 er max
 double idleSpeed = 1.7; //Bestemmer hvor hurtigt idle-fadet skal være - jo højere destro hurtigere - Default 1.7
 double idlePause = 5.0; //Bestemmer pausen mellem idle-fades - Default 5.0
 double idleTimeout = 3.0; //Bestemmer hvor mange sekunders stilhed der skal være, før devicet går i idle tilstand. 
 
+//Special settings
+double decayRate = 1.0; //Bestemmer hvor hurtigt lyset skal fade ud - jo højere destro hurtigere - Default 1.0
+
 //Variables (ikke pil ved dem her)
+double noiseFloorMic = 0.08; //Skal kalibreres on-location. Bestemmer hvor cut-off punktet skal være for den ambiente støj på både mics og i området. - skal kun reagere over dette niveau.
 #define lightPin 9
 #define smoothSteps 10 // Smooth steps (50 index's == 2.5 second smoothing with 50ms sampleWindow)
 const int sampleWindow = 50; // Sample window width in mS (50 mS = 20Hz)
@@ -78,7 +83,7 @@ void loop(){
            signalMin2 = sample;  // save just the min levels
         }
      } 
-     //Mic 1
+     //Mic 3
      sample = analogRead(2); 
      if (sample < 1024)  // toss out spurious readings
      {
@@ -90,29 +95,32 @@ void loop(){
         {
            signalMin3 = sample;  // save just the min levels
         }
-     } 
+     }
   }
   
   //Mic 1
   peakToPeak = signalMax - signalMin;  // max - min = peak-peak amplitude
   double volts = (peakToPeak * 3.3) / 1024;  // convert to volts
-  volts -= minVolts;
+  volts -= (noiseFloorMic + ambientNoise);
+  volts = constrain(volts,0.0,maxVolts);
   
   //Mic 2
   peakToPeak2 = signalMax2 - signalMin2;  // max - min = peak-peak amplitude
-  double volts2 = (peakToPeak2 * 3.3) / 1024;  // convert to volts
-  volts2 -= minVolts;
+  double volts2 = (peakToPeak2 * 3.3) / 1024;
+  volts2 -= (noiseFloorMic + ambientNoise);
+  volts2 = constrain(volts2,0.0,maxVolts);
   
   //Mic 3
   peakToPeak3 = signalMax3 - signalMin3;  // max - min = peak-peak amplitude
   double volts3 = (peakToPeak3 * 3.3) / 1024;  // convert to volts
-  volts3 -= minVolts;
+  volts3 -= (noiseFloorMic + ambientNoise);
+  volts3 = constrain(volts3,0.0,maxVolts);
   
   //Add all voltages together and limit to maxVolts
   double allVolts = volts + volts2 + volts3;
   allVolts = constrain(allVolts, 0.0, maxVolts);
-  //Serial.println(allVolts);
-  
+  Serial.println(allVolts);
+
   //Add power
   power += allVolts;
    
@@ -138,8 +146,8 @@ void loop(){
   power = constrain(power, 0.0, maxPower);
   
   //Set resistance for next cycle
-  resistance = (minVolts * 3) + (power/10);
-  resistance = constrain(resistance, minVolts, maxVolts - 0.2);
+  resistance = maxVolts * ((1.0/maxPower) * power);
+  resistance = constrain(resistance, 0.02, maxVolts - 0.1);
   
   //Calculate brightness
   float fraction = 255.0/maxPower;
@@ -152,7 +160,7 @@ void loop(){
     currentIdleIndex = -idlePause;
     upIdleDirection = true;
     idle = true;
-  } 
+  }
   
   if (idle == true) {
     if (brightness > currentIdleBrightness + 3) {
@@ -187,8 +195,8 @@ void loop(){
   } else {
     brightness = 0;
   }
-  Serial.println(brightness);
-  analogWrite(lightPin, brightness);
+  //Serial.println(brightness);
+  analogWrite(lightPin, 255 - brightness);
   
  
  
